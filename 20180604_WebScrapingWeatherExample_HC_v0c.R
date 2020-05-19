@@ -33,7 +33,7 @@ bbc_weather <- read_html("https://www.bbc.co.uk/weather/2653822")
 # rather than running this command for day0, day1 etc, turn into a function:
 
 # original command:
-bbc_weather %>% html_node("#daylink-3 .wr-value--temperature--c") %>% html_text()
+bbc_weather %>% html_node("#daylink-0 .wr-value--temperature--c") %>% html_text()
 
 # turns into this function:
 fn_temp_bbc <- function(x){
@@ -53,7 +53,7 @@ bbc_temps <- unlist(bbc_temps)
 # rather than running this command for day0, day1 etc, turn into a function
 
 # original command:
-bbc_weather %>% html_node("#daylink-1 .wr-day__weather-type-description-container") %>% html_text()
+bbc_weather %>% html_node("#daylink-0 .wr-day__weather-type-description-container") %>% html_text()
 
 # turns into this function:
 fn_desc_bbc <- function(x){
