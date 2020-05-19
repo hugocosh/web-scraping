@@ -1,0 +1,190 @@
+
+---
+title: "Web scraping example: weather forecast"
+output: 
+  flexdashboard::flex_dashboard:
+    vertical_layout: scroll
+runtime: shiny
+
+css: styles.css
+---
+
+
+```{r setup, include=FALSE}
+# this bit gets put in automatically when you start a new RMarkdown - can be ignored - sets all chunks to 'echo = TRUE', which means that the outputs from the code will be shown in the RMarkdown document, as opposed to hidden
+
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+```{r global, include=FALSE}
+
+library(rvest)
+library(magrittr)
+library(DT)
+
+#####
+
+# put hyperlinks into objects
+
+bbc_weather_cardiff <- "https://www.bbc.co.uk/weather/2653822"
+bbc_weather_mold <- "https://www.bbc.co.uk/weather/2642372"
+bbc_weather_carmarthen <- "https://www.bbc.co.uk/weather/2653755"
+
+metoffice_weather_cardiff <- "https://www.metoffice.gov.uk/weather/forecast/gcjszmp44"
+metoffice_weather_mold <- "https://www.metoffice.gov.uk/weather/forecast/gcmy2w9pd"
+metoffice_weather_carmarthen <- "https://www.metoffice.gov.uk/weather/forecast/gchzjb39w"
+
+```
+
+
+BBC vs Met Office {.tables}
+=========================================
+
+```{r test, echo=FALSE}
+
+
+# front end (UI, User Interface)
+#########################################
+
+
+fillCol(
+  
+  height = 400
+  , flex = c(NA, 1)
+  , inputPanel(
+    radioButtons('place', 'Choose Observatory site', choices = c('Mold', 'Cardiff', 'Carmarthen'), selected = 'Mold')
+  )
+  , dataTableOutput("week_forecast_DT")
+
+    ) # end of fillCol function
+
+
+# back end (server side - getting the data and making the table)
+#########################################
+
+
+
+# make reactive table
+    output$week_forecast_DT <- renderDataTable({
+      
+    # set up list of dates for the week to come
+    date0 <- Sys.Date()
+    dates <- c(date0 +1, date0 +2, date0 +3, date0 +4, date0 +5, date0 +6, date0 +7)
+    dates <- format(dates, format = "%a %d %b")
+
+  
+# read from hyperlinks listed above depending on which user option has been chosen  
+    bbc_link <- ifelse(input$place =='Cardiff', bbc_weather_cardiff, ifelse(input$place == 'Mold', bbc_weather_mold, bbc_weather_carmarthen))
+    
+    met_office_link <- ifelse(input$place=='Cardiff', metoffice_weather_cardiff, ifelse(input$place == 'Mold', metoffice_weather_mold, metoffice_weather_carmarthen))
+
+    bbc_weather <- read_html(bbc_link)
+    metoffice_weather <- read_html(met_office_link)
+    
+
+### BBC forecast
+#################################################################
+  
+## get daily temps
+
+# run function to get BBC temps
+fn_temp_bbc <- function(x){
+  bbc_weather %>% html_node(paste0("#daylink-", x, " .wr-value--temperature--c")) %>% html_text()
+}
+
+# run function for days 0 to 6
+bbc_temps <- lapply(0:6, fn_temp_bbc)
+
+# turn results from list to vector
+bbc_temps <- unlist(bbc_temps)
+
+
+## get daily description
+
+# run function to get BBC descriptions
+fn_desc_bbc <- function(x){
+  bbc_weather %>% html_node(paste0("#daylink-", x, " .wr-day__weather-type-description-container")) %>% html_text()
+}
+
+# run function for days 0 to 6
+bbc_desc <- lapply(0:6, fn_desc_bbc)
+
+# turn results from list to vector
+bbc_desc <- unlist(bbc_desc)
+
+
+### Met office forecast
+#################################################################
+
+## get daily temps
+
+# rather than running this command for day0, day1 etc, turn into a function
+fn_temp_met <- function(x){
+  metoffice_weather %>%  html_node(paste0("#tabDay", x, " .tab-temp-high")) %>%  html_text() -> day1met_temp
+}
+
+# run function for days 0 to 6
+met_temps <- lapply(0:6, fn_temp_met)
+
+# turn results from list to vector
+met_temps <- unlist(met_temps)
+
+
+## get daily description
+
+# rather than running this command for day0, day1 etc, turn into a function
+fn_desc_met <- function(x){
+  desc <- metoffice_weather %>%  html_node(paste0("#tabDay", x, " .summary-text.hide-xs-only")) %>%  html_text()
+  desc <- substr(desc, 2, nchar(desc)-2)
+  return(desc)
+  }
+
+# run function for days 0 to 6
+met_desc <- lapply(0:6, fn_desc_met)
+
+# turn results from list to vector
+met_desc <- unlist(met_desc)
+
+
+# Now create dataset incorporating BBC and Met office forecasts
+week_forecast <- data.frame(dates, bbc_temps, bbc_desc, met_temps, met_desc)
+colnames(week_forecast) <- c("date", "BBC temp", "BBC description", "Met office temp", "Met office description")
+
+
+# And finally run the datatable command to make the interactive table
+
+    datatable(week_forecast, rownames = FALSE, options = list(dom = 't')) %>% 
+    
+    # formatStyle('date', fontWeight ='bold' ) %>% 
+        
+    formatStyle('BBC temp'
+                , color = '#4682B4'
+                , backgroundColor = 'white'
+                , fontWeight = 'bold') %>% 
+        
+    formatStyle('Met office temp'
+                , color = '#4682B4'
+                , backgroundColor = 'white'
+                , fontWeight = 'bold') %>% 
+        
+    formatStyle(0   #must specify columns first - what does zero mean?
+                , target = "row"  # format rows, not columns
+                , backgroundColor = 'white'
+                #, fontWeight ='bold'
+                , lineHeight='50%') %>% 
+
+    formatStyle(0
+                ,target="row"
+                , border = styleInterval(20, c('auto', '1px solid #ddd')))
+  
+    })
+
+
+ 
+
+```
+
+
+source: Met Office / BBC websites
